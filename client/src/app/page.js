@@ -31,28 +31,32 @@ export default function HomePage() {
   const [stats, setStats] = useState(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setLoadError(false);
+      const [placesRes, statesRes, catRes, statsRes] = await Promise.all([
+        api.getPlaces({ limit: 8 }),
+        api.getStates(),
+        api.getCategories(),
+        api.getStats(),
+      ]);
+
+      if (placesRes.success) setFeaturedPlaces(placesRes.data || []);
+      if (statesRes.success) setStates(statesRes.data || []);
+      if (catRes.success) setCategories(catRes.data || []);
+      if (statsRes.success) setStats(statsRes.data || null);
+    } catch (err) {
+      console.error('Failed to load homepage data:', err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const [placesRes, statesRes, catRes, statsRes] = await Promise.all([
-          api.getPlaces({ limit: 8 }),
-          api.getStates(),
-          api.getCategories(),
-          api.getStats(),
-        ]);
-
-        if (placesRes.success) setFeaturedPlaces(placesRes.data || []);
-        if (statesRes.success) setStates(statesRes.data || []);
-        if (catRes.success) setCategories(catRes.data || []);
-        if (statsRes.success) setStats(statsRes.data || null);
-      } catch (err) {
-        console.error('Failed to load homepage data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
   }, []);
 
@@ -300,6 +304,24 @@ export default function HomePage() {
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-72 bg-slate-200 rounded-2xl animate-pulse" />
             ))}
+          </div>
+        ) : filteredPlaces.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300 space-y-3">
+            <Compass className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="text-base font-bold text-slate-700">
+              {loadError ? 'Backend Server Connecting...' : 'No tourist destinations available'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              {loadError
+                ? 'The cloud server may be waking up from sleep. Please wait a moment and retry.'
+                : 'Content is being initialized in the database.'}
+            </p>
+            <button
+              onClick={loadData}
+              className="mt-2 px-4 py-2 rounded-xl bg-saffron-600 hover:bg-saffron-700 text-white font-bold text-xs shadow-sm"
+            >
+              🔄 Refresh Content
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

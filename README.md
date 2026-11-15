@@ -223,8 +223,34 @@ npm test
 ## 🔐 Admin Portal Access
 
 To access the editorial dashboard:
-1. Navigate to `http://localhost:3000/admin/login` in your browser.
+1. Navigate to `/admin/login` in your browser.
 2. Sign in with the seeded credentials:
    - **Email**: `admin@travelbharat.in`
    - **Password**: `Admin@123456`
 3. You will be redirected to the `/admin` dashboard where you can create, modify, and delete states, cities, and tourist destinations.
+
+---
+
+## ☁️ Cloud Deployment & Production Checklist
+
+If deploying to platforms like **Render**, **Railway**, or **Vercel**:
+
+### 1. MongoDB Atlas Configuration
+- In your **MongoDB Atlas** dashboard:
+  - Go to **Network Access** → Click **Add IP Address** → Choose **Allow Access from Anywhere (`0.0.0.0/0`)**. Cloud hosting platforms (like Render/Railway) use dynamic outbound IPs. If not set to `0.0.0.0/0`, Atlas will reject connections when your server wakes up or changes instances.
+  - In **Database Access**, verify your database user has read/write privileges. If the password has special characters (`@`, `:`, `/`), URL-encode them.
+
+### 2. Environment Variables Checklist
+- **Backend (Render / Railway)**:
+  - `PORT`: `5000` (or host provided)
+  - `NODE_ENV`: `production`
+  - `MONGODB_URI`: `mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/travelbharat?retryWrites=true&w=majority`
+  - `CLIENT_URL`: URL of your frontend (e.g. `https://your-app.vercel.app`)
+  - `JWT_SECRET`: A long secure random string
+- **Frontend (Vercel)**:
+  - `NEXT_PUBLIC_API_URL`: URL of your backend with `/api` path (e.g. `https://your-backend.onrender.com/api` without trailing slash)
+
+### 3. Understanding Cloud Sleep & Cold Starts (Free Tier)
+- Free tier services on Render sleep after 15 minutes of inactivity. When a request arrives, it takes 30-50 seconds for the backend container to wake up.
+- The frontend includes built-in retry and cold-start tolerance. If a request times out while the server is waking up, click **"Refresh Content"** or visit your backend URL's `/api/health` to trigger wakeup.
+- Check live database status anytime by visiting `https://your-backend.onrender.com/api/health`. It reports MongoDB connection state and document counts in real time.

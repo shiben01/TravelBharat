@@ -21,26 +21,46 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [recentPlaces, setRecentPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reseeding, setReseeding] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [statsRes, placesRes] = await Promise.all([
+        api.getStats(),
+        api.getPlaces({ limit: 6, sort: 'newest' }),
+      ]);
+
+      if (statsRes.success) setStats(statsRes.data);
+      if (placesRes.success) setRecentPlaces(placesRes.data || []);
+    } catch (err) {
+      console.error('Failed to load dashboard metrics:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const [statsRes, placesRes] = await Promise.all([
-          api.getStats(),
-          api.getPlaces({ limit: 6, sort: 'newest' }),
-        ]);
-
-        if (statsRes.success) setStats(statsRes.data);
-        if (placesRes.success) setRecentPlaces(placesRes.data || []);
-      } catch (err) {
-        console.error('Failed to load dashboard metrics:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
   }, []);
+
+  const handleReseed = async () => {
+    if (!window.confirm('Restore/re-seed all default States, Cities, and Places into the database?')) {
+      return;
+    }
+    try {
+      setReseeding(true);
+      setMessage('');
+      const res = await api.reseedDatabase();
+      setMessage(res.message || 'Database successfully restored!');
+      await loadData();
+    } catch (err) {
+      alert(err.message || 'Failed to reseed database');
+    } finally {
+      setReseeding(false);
+    }
+  };
 
   return (
     <AdminGuard>
@@ -61,7 +81,15 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleReseed}
+              disabled={reseeding}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition-colors shadow-xs"
+              title="Restores all default States, Cities, and Places into the database"
+            >
+              {reseeding ? 'Restoring...' : '🔄 Restore Default Content'}
+            </button>
             <Link
               href="/admin/places"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-saffron-600 hover:bg-saffron-700 text-white font-semibold text-xs transition-colors shadow-sm"
@@ -70,6 +98,13 @@ export default function AdminDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {message && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center justify-between">
+            <span>{message}</span>
+            <button onClick={() => setMessage('')} className="text-emerald-600 hover:text-emerald-900">✕</button>
+          </div>
+        )}
 
         {/* Metric Cards Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

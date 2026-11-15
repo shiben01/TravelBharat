@@ -21,9 +21,15 @@ export function AuthProvider({ children }) {
       if (res.success && res.user) {
         setAdmin(res.user);
       } else {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('tb_auth_token');
+        }
         setAdmin(null);
       }
     } catch (err) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('tb_auth_token');
+      }
       setAdmin(null);
     } finally {
       setLoading(false);
@@ -37,6 +43,9 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const res = await api.login(email, password);
     if (res.success && res.user) {
+      if (res.token && typeof window !== 'undefined') {
+        localStorage.setItem('tb_auth_token', res.token);
+      }
       setAdmin(res.user);
       return res.user;
     }
@@ -47,6 +56,9 @@ export function AuthProvider({ children }) {
     try {
       await api.logout();
     } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('tb_auth_token');
+      }
       setAdmin(null);
     }
   };

@@ -1,10 +1,19 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const rawBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE = rawBase.replace(/\/+$/, '');
 
-async function request(endpoint, options = {}) {
+async function request(endpoint, options = {}, retries = 1) {
   const url = `${API_BASE}${endpoint}`;
   const defaultHeaders = {
     'Content-Type': 'application/json',
   };
+
+  // Attach token from localStorage if available (ensures cross-domain auth works even if third-party cookies are blocked)
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('tb_auth_token');
+    if (token) {
+      defaultHeaders['Authorization'] = `Bearer ${token}`;
+    }
+  }
 
   const config = {
     ...options,
@@ -19,20 +28,33 @@ async function request(endpoint, options = {}) {
     config.body = JSON.stringify(options.body);
   }
 
-  const res = await fetch(url, config);
-  const data = await res.json().catch(() => ({}));
+  try {
+    const res = await fetch(url, config);
+    const data = await res.json().catch(() => ({}));
 
-  if (!res.ok) {
-    const error = new Error(data.message || 'Network request failed');
-    error.status = res.status;
-    error.data = data;
-    throw error;
+    if (!res.ok) {
+      const error = new Error(data.message || `Request failed with status ${res.status}`);
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+
+    return data;
+  } catch (err) {
+    // If backend is on a free tier cold start (e.g. Render waking up), retry once after 1.5s
+    if (retries > 0 && (err.name === 'TypeError' || err.status >= 500)) {
+      console.warn(`[API] Retrying ${endpoint} due to connection lag or cold start...`);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return request(endpoint, options, retries - 1);
+    }
+    throw err;
   }
-
-  return data;
 }
 
 export const api = {
+  // Diagnostics
+  checkHealth: () => request('/health'),
+
   // Public
   getStates: (params = {}) => {
     const qs = new URLSearchParams();
@@ -85,4 +107,7 @@ export const api = {
   createPlace: (data) => request('/admin/places', { method: 'POST', body: data }),
   updatePlace: (id, data) => request(`/admin/places/${id}`, { method: 'PUT', body: data }),
   deletePlace: (id) => request(`/admin/places/${id}`, { method: 'DELETE' }),
+
+  // Emergency Database Content Reseed
+  reseedDatabase: () => request('/admin/reseed', { method: 'POST' }),
 };
